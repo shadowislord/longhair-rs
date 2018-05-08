@@ -1,0 +1,13 @@
+[package]
+name = "longhair-rs"
+description = """
+Safe Rust bindings to the Longhair library (Cauchy Reed-Solomon Forward Error Correction)
+"""
+version = "0.4.0"
+authors = ["Kirill Vainer"]
+license = "GPL-3.0-or-later"
+links = "longhair"
+
+[build-dependencies]
+cc = "1.0"
+bindgen = "0.36"
