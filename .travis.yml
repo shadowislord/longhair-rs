@@ -7,9 +7,15 @@ addons:
     packages:
       - gcc-multilib
       - g++-multilib
-compiler:
-  - gcc
-  - clang
+cache:
+  directories:
+    - /home/travis/.cargo
+before_cache:
+  - rm -rf /home/travis/.cargo/registry
+matrix:
+  include:
+    - env: CC=clang CXX=clang++
+    - env: CC=gcc CXX=g++
 script:
   - rustup target add i586-unknown-linux-gnu
   - cargo build
