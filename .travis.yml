@@ -16,6 +16,13 @@ matrix:
   include:
     - env: CC=clang CXX=clang++
     - env: CC=gcc CXX=g++
+    - env: CC=gcc-8 CXX=g++-8
+      addons:
+        sources:
+          - ubuntu-toolchain-r-test
+        packages:
+          - gcc-8-multilib
+          - g++-8-multilib
 script:
   - rustup target add i586-unknown-linux-gnu
   - cargo build
