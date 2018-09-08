@@ -3,7 +3,7 @@
 use std::borrow::{Borrow, BorrowMut};
 use std::sync::{Once, ONCE_INIT};
 
-include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+include!("bindings.rs");
 
 static CAUCHY_INITIALIZED: Once = ONCE_INIT;
 
@@ -18,7 +18,7 @@ pub struct Cauchy {
     max_k: u32,
     block_ptrs: Vec<*const u8>,
     recovery_block_ptrs: Vec<*mut u8>,
-    native_block_ptrs: Vec<_Block>,
+    native_block_ptrs: Vec<Block>,
 }
 
 impl Cauchy {
@@ -63,17 +63,17 @@ impl Cauchy {
         self.block_ptrs.clear();
 
         let mut block_bytes_opt = None;
-        for i in 0..blocks.len() {
-            let block = blocks[i].borrow();
+        for block in blocks {
+            let data = block.borrow();
             if let Some(block_bytes) = block_bytes_opt {
-                if block.len() != block_bytes {
+                if data.len() != block_bytes {
                     panic!("all blocks must have the same size");
                 }
             } else {
-                block_bytes_opt = Some(block.len());
+                block_bytes_opt = Some(data.len());
             }
 
-            self.block_ptrs.push(block.as_ptr() as *const u8);
+            self.block_ptrs.push(data.as_ptr() as *const u8);
         }
 
         let block_bytes = block_bytes_opt.unwrap();
@@ -82,15 +82,15 @@ impl Cauchy {
         }
 
         self.recovery_block_ptrs.clear();
-        for i in 0..recovery_blocks.len() {
-            let recovery_block = recovery_blocks[i].borrow_mut();
-            if block_bytes != recovery_block.len() {
+        for recovery_block in recovery_blocks {
+            let data = recovery_block.borrow_mut();
+            if block_bytes != data.len() {
                 panic!("all blocks must have the same size");
             }
-            self.recovery_block_ptrs
-                .push(recovery_block.as_mut_ptr() as *mut u8);
+            self.recovery_block_ptrs.push(data.as_mut_ptr() as *mut u8);
         }
 
+        // println!("longhair-rs: block_bytes: {}", block_bytes);
         // println!("longhair-rs: block_ptrs: {:?}", self.block_ptrs);
         // println!(
         //     "longhair-rs: recovery_block_ptrs: {:?}",
@@ -141,7 +141,7 @@ impl Cauchy {
                 panic!("block number cannot be >= k + m");
             }
 
-            self.native_block_ptrs.push(_Block {
+            self.native_block_ptrs.push(Block {
                 row: index as u8,
                 data: data.as_ptr() as *mut u8,
             });
