@@ -10,10 +10,9 @@ fn main() {
         .static_flag(true)
         .flag("-std=c++11")
         .flag_if_supported("-Wno-implicit-fallthrough")
-        // .flag("-Wno-unused-function")
-        // .flag_if_supported("-fomit-frame-pointer")
-        // .flag_if_supported("-fbuiltin")
-        // .flag_if_supported("-funroll-loops") // GCC only
+        .flag_if_supported("-fomit-frame-pointer")
+        .flag_if_supported("-fbuiltin")
+        .flag_if_supported("-funroll-loops") // GCC only
         .include("longhair/")
         .file("longhair/cauchy_256.cpp")
         .file("longhair/gf256.cpp")
