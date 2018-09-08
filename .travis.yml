@@ -2,6 +2,11 @@ dist: trusty
 language: rust
 sudo: false
 rust: stable
+addons:
+  apt:
+    packages:
+      - gcc-multilib
+      - g++-multilib
 compiler:
   - gcc
   - clang
