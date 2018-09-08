@@ -1,5 +1,12 @@
 #![allow(non_snake_case)]
 
+#[macro_use]
+#[cfg(test)]
+extern crate proptest;
+
+#[cfg(test)]
+extern crate rand;
+
 use std::borrow::{Borrow, BorrowMut};
 use std::sync::{Once, ONCE_INIT};
 
@@ -170,8 +177,14 @@ impl Cauchy {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
+    use rand::{thread_rng, Rng};
 
-    impl<'a> AsBlock for (u32, &'a mut [u8]) {
+    impl<'a, T> AsBlock for (u32, &'a mut T)
+    where
+        T: Borrow<[u8]>,
+        T: BorrowMut<[u8]>,
+    {
         fn set_index(&mut self, index: u32) {
             self.0 = index;
         }
@@ -179,43 +192,77 @@ mod tests {
             self.0
         }
         fn data_mut(&mut self) -> &mut [u8] {
-            self.1
+            &mut *self.1.borrow_mut()
         }
         fn data(&self) -> &[u8] {
-            self.1
+            &*(*self.1).borrow()
         }
     }
 
-    #[test]
-    fn encode_and_decode() {
-        let mut cauchy = Cauchy::new(2);
-        let mut d = vec![[0, 1, 2, 3, 4, 5, 6, 7], [8, 9, 10, 11, 12, 13, 14, 15]];
-        let mut r = vec![[0; 8], [0; 8]];
+    type Block = Box<[u8]>;
 
-        cauchy.encode(&d[..], &mut r[..]);
-        assert_eq!([8, 8, 8, 8, 8, 8, 8, 8], r[0]);
-        assert_eq!([0, 9, 11, 9, 15, 9, 11, 9], r[1]);
-
-        let mut recover_me: [(u32, &mut [u8]); 2] =
-            [(3, &mut r[1].clone()), (1, &mut d[1].clone())];
-        cauchy.decode(2, 2, &mut recover_me);
-        assert_data_recovered_ok(&recover_me);
-
-        let mut recover_me: [(u32, &mut [u8]); 2] =
-            [(0, &mut d[0].clone()), (3, &mut r[1].clone())];
-        cauchy.decode(2, 2, &mut recover_me);
-        assert_data_recovered_ok(&recover_me);
-
-        let mut recover_me: [(u32, &mut [u8]); 2] =
-            [(2, &mut r[0].clone()), (3, &mut r[1].clone())];
-        cauchy.decode(2, 2, &mut recover_me);
-        assert_data_recovered_ok(&recover_me);
+    fn generate_block(block_size: usize) -> Block {
+        let mut b = vec![0_u8; block_size];
+        thread_rng().fill(&mut *b);
+        b.into_boxed_slice()
     }
 
-    fn assert_data_recovered_ok<B: AsBlock>(recover_me: &[B]) {
-        assert_eq!(0, recover_me[0].index());
-        assert_eq!(1, recover_me[1].index());
-        assert_eq!(&[0, 1, 2, 3, 4, 5, 6, 7], recover_me[0].data());
-        assert_eq!(&[8, 9, 10, 11, 12, 13, 14, 15], recover_me[1].data());
+    fn empty_blocks(block_size: usize, num_blocks: u32) -> Vec<Block> {
+        let mut blocks = Vec::with_capacity(num_blocks as usize);
+        for _ in 0..num_blocks {
+            blocks.push(vec![0_u8; block_size].into_boxed_slice());
+        }
+        blocks
+    }
+
+    prop_compose! {
+        fn block_size(max: usize)(base in 1..=max/8) -> usize {
+            base * 8
+        }
+    }
+
+    prop_compose! {
+        fn random_block(block_size: usize)(size in Just(block_size))
+            -> Box<[u8]> {
+            generate_block(size)
+        }
+    }
+
+    prop_compose! {
+        fn random_blocks(max_size: usize)
+                 (block_size in block_size(max_size))
+                 (v in prop::collection::vec(random_block(block_size), 1..32)) -> Vec<Block> {
+            v
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn encode_decode(input in random_blocks(512), output_blocks in 2u32..32) {
+            let input_blocks = input.len() as u32;
+            let block_size = input[0].len();
+            prop_assume!(input_blocks + output_blocks <= 255);
+
+            let mut output = empty_blocks(block_size, output_blocks);
+            let mut cauchy = Cauchy::new(input_blocks as u32);
+
+            cauchy.encode(&input, &mut output);
+
+            let mut input_cloned = input.clone();
+            let mut output_with_indices = input_cloned.iter_mut().chain(output.iter_mut())
+                                        .enumerate()
+                                        .map(|(i,b)| (i as u32, b))
+                                        .collect::<Vec<_>>();
+            thread_rng().shuffle(&mut output_with_indices);
+            output_with_indices.truncate(input_blocks as usize);
+            cauchy.decode(input_blocks, output_blocks, &mut output_with_indices[..]);
+            output_with_indices.sort_by_key(|&(i,_)|i);
+
+            for (expected_index, expected_block) in input.iter().enumerate() {
+                let &(actual_index, ref actual_block) = &output_with_indices[expected_index];
+                assert_eq!(expected_index as u32, actual_index);
+                assert_eq!(expected_block, *actual_block);
+            }
+        }
     }
 }
