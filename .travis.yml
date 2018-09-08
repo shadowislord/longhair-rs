@@ -1,14 +1,13 @@
+dist: trusty
 language: rust
 sudo: false
-rust:
-  - stable
-  - beta
-  - nightly
-matrix:
-  allow_failures:
-    - rust: nightly
-  fast_finish: true
+rust: stable
+compiler:
+  - gcc
+  - clang
 script:
-  - cargo build --verbose
-  - cargo test --verbose
-  - cargo test --release --verbose
+  - rustup target add i586-unknown-linux-gnu
+  - cargo build
+  - cargo test
+  - cargo test --release
+  - cargo test --target i586-unknown-linux-gnu --release
