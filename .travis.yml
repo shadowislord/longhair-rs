@@ -14,9 +14,12 @@ before_cache:
   - rm -rf /home/travis/.cargo/registry
 matrix:
   include:
-    - env: CC=clang CXX=clang++
-    - env: CC=gcc CXX=g++
-    - env: CC=gcc-8 CXX=g++-8
+    - os: linux
+      env: CC=clang CXX=clang++
+    - os: linux
+      env: CC=gcc CXX=g++
+    - os: linux
+      env: CC=gcc-8 CXX=g++-8
       addons:
         sources:
           - ubuntu-toolchain-r-test
